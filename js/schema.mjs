@@ -100,9 +100,9 @@ export function parseBackup(text) {
 export function initialState(now = Date.now()) {
   const goal = (id, title, sessions, extra = {}) => ({ id, title, sessions, kind: 'minutes', status: 'active', targetMonth: null, nextStep: 'まず1回、小さく始める', note: '', milestones: [{ id: 'first', title: '最初の1回を試す', done: false }], english: false, ...extra });
   return { schemaVersion: 1, revision: 0, savedAt: new Date(now).toISOString(), profile: { birthYearMonth: '1996-04', planningAge: 80 }, weeks: {}, goals: [
-    goal('strength', '筋トレ', [{ minutes: 2, day: 1 }, { minutes: 2, day: 4 }], { kind: 'slot3', nextStep: '洗顔直後、または仕事後に2分' }),
-    goal('bookkeeping', '簿記', [30, 30, 60].map(minutes => ({ minutes, day: 'any' })), { targetMonth: '2027-08', nextStep: '仕訳を1問解く', note: '最初は週2時間。30分を2回、60分を1回。' }),
-    goal('english', '英会話の事前練習', [10, 10, 10].map(minutes => ({ minutes, day: 'any' })), { targetMonth: '2027-01', english: true, nextStep: '短い自己紹介を声に出す', note: '2027年1月末から受講予定。事前練習は受講30時間に加算しません。' }),
+    goal('strength', '筋トレ', [{ minutes: 2, day: 1 }, { minutes: 2, day: 4 }], { kind: 'slot3', nextStep: '朝または仕事後に2分' }),
+    goal('bookkeeping', '簿記', [30, 30, 60].map(minutes => ({ minutes, day: 'any' })), { targetMonth: '2030-03', nextStep: '仕訳を1問解く', note: '架空のサンプル。30分を2回、60分を1回。' }),
+    goal('english', '英会話の事前練習', [10, 10, 10].map(minutes => ({ minutes, day: 'any' })), { targetMonth: '2029-10', english: true, nextStep: '短い自己紹介を声に出す', note: '架空のサンプル。事前練習は受講時間に加算しません。' }),
     goal('sidework', '副業', [{ minutes: 30, day: 'weekend' }], { nextStep: '身近なサービスを観察して学ぶ', note: '週末に余裕があれば。初回は観察と学び。時間ノルマなし。' })
   ] };
 }

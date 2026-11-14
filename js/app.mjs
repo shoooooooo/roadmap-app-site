@@ -56,8 +56,8 @@ function recordDialog(item, wk = weekStart(today())) {
     selectField('状態', 'record-status', [['done', '実施した'], ['rest', '休み']], 'done'),
     field('実施日（日本時間）', 'record-date', { type: 'date', required: true, min: wk, max: today() }, /^\d{4}-/.test(item.day) ? item.day : r?.date || today()),
     field('実施した時間（分）', 'record-minutes', { type: 'number', min: 1, max: 240, required: true }, r?.minutes || item.minutes));
-  if (item.kind === 'slot3') form.append(selectField('タイミング', 'record-slot', [['morning', '朝（洗顔直後）'], ['after-work', '仕事後']], 'morning'));
-  if (item.english) form.append(p('事前練習として保存します。受講30時間には加算しません。', 'muted'));
+  if (item.kind === 'slot3') form.append(selectField('タイミング', 'record-slot', [['morning', '朝'], ['after-work', '仕事後']], 'morning'));
+  if (item.english) form.append(p('事前練習として保存します。受講時間には加算しません。', 'muted'));
   form.append(field('一行メモ（任意・100文字まで）', 'record-memo', { maxlength: 100 }, r?.memo || ''), el('button', { type: 'submit', class: 'primary' }, 'この内容で記録する'));
   openDialog('行動を記録する', form);
 }
@@ -124,7 +124,7 @@ function weekView(s) {
   for (const gid of gids) {
     const items = w.items.filter(p => p.goalId === gid), stat = summary(w, gid, today(), wk);
     const card = el('article', { class: 'card', 'data-goal': gid }, el('h2', {}, items[0].title), el('div', { class: 'stats' }, el('span', {}, `予定 ${stat.count}回 / ${stat.planned}分`), el('span', {}, `実施 ${stat.done}回 / ${stat.minutes}分`), el('span', {}, `休み ${stat.rest}`), el('span', {}, `未記録 ${stat.missed}`), el('span', {}, `残り ${stat.remaining}`)));
-    if (items[0].english) card.append(p('事前練習のみ。受講30時間への加算はありません。', 'muted'));
+    if (items[0].english) card.append(p('事前練習のみ。受講時間への加算はありません。', 'muted'));
     for (const item of items) {
       const r = w.records[item.id]; const dateText = item.day === 'any' ? 'いつでも' : item.day === 'weekend' ? '週末に余裕があれば' : dateLabel(item.day);
       const status = r ? statusLabel(r) : frozen || (!['any', 'weekend'].includes(item.day) && item.day < today()) ? '未記録' : '予定・未実施';
