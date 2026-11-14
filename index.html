@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#193e38">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'none'; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>みちしるべ | 人生ロードマップ</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/app.css">
+  <script type="module" src="js/app.mjs"></script>
+</head>
+<body>
+  <header class="site-header"><div class="brand"><span class="brand-mark" aria-hidden="true">↗</span><div><strong>みちしるべ</strong><small>小さな一歩を、これからにつなぐ</small></div></div><span class="local-badge">端末内に保存</span></header>
+  <div id="test-clock" class="notice" hidden></div>
+  <div id="error" class="error" role="alert" hidden></div>
+  <nav aria-label="画面の切り替え"><button data-page="today" aria-current="page"><span aria-hidden="true">◉</span>今日</button><button data-page="week"><span aria-hidden="true">▦</span>今週</button><button data-page="roadmap"><span aria-hidden="true">↗</span>ロードマップ</button></nav>
+  <main id="main"></main>
+  <footer><details id="backup-panel"><summary>データの書き出し・復元</summary><p>このブラウザだけに保存しています。定期的にバックアップしてください。復元すると現在のデータ全体を置き換えます。</p><div class="actions"><button id="export">バックアップを書き出す</button><button id="raw-export">保存中の元データを出力</button></div><label class="file-label" for="restore-file">バックアップから復元（JSON・1MBまで）</label><input id="restore-file" type="file" accept="application/json,.json"><p id="backup-message" role="status"></p></details><p class="footnote">架空のサンプルから始める、あなたの計画帳。日本時間・月曜始まり。</p></footer>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <dialog id="dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div><button id="dialog-close" class="quiet">閉じる</button></dialog>
+</body>
+</html>
