@@ -37,8 +37,8 @@ function formShell(onSubmit) {
   form.addEventListener('submit', e => { e.preventDefault(); err.textContent = ''; try { onSubmit(new FormData(form)); } catch (e) { err.textContent = e.message; } });
   form.append(err); return form;
 }
-function heading(kicker, title, subtitle) {
-  return [el('div', { class: 'eyebrow' }, kicker), el('h1', { tabindex: '-1' }, title), p(subtitle, 'intro')];
+function heading(title, subtitle, date = null) {
+  return [el('h1', { tabindex: '-1' }, title), date ? p(date, 'page-date') : null, p(subtitle, 'intro')].filter(Boolean);
 }
 function recordNow(item, status, slot = null) {
   const value = { status, date: today(), slot, minutes: status === 'done' ? item.minutes : null, memo: '' };
@@ -83,8 +83,8 @@ function todayView(s, w) {
   const date = today();
   const completed = w.items.filter(p => w.records[p.id]?.date === date && ['done', 'rest'].includes(w.records[p.id].status));
   const list = suggestions(w, date);
-  main.append(...heading('TODAY / ' + dateLabel(date), '今日の、小さな一歩。', '全部やらなくて大丈夫。今日に合うものを一つ選びましょう。'),
-    el('div', { class: 'hero' }, el('div', { class: 'eyebrow' }, '一歩ずつ、積み重ねる'), el('h2', {}, completed.length ? `今日は${completed.length}件、記録できました` : 'まずは、できそうなことから'), p('記録はこの端末のブラウザ内に保存されます。', 'muted')),
+  main.append(...heading('今日の、小さな一歩。', '全部やらなくて大丈夫。今日に合うものを一つ選びましょう。', dateLabel(date)),
+    el('div', { class: 'card overview' }, el('h2', {}, completed.length ? `今日は${completed.length}件、記録できました` : 'まずは、できそうなことから'), p('記録はこの端末のブラウザ内に保存されます。', 'muted')),
     el('div', { class: 'section-heading' }, el('h2', {}, '今日の候補'), el('small', {}, '日本時間')));
   for (const item of list) main.append(candidate(item, w));
   if (!list.length) main.append(p('いまの候補はありません。今週の記録を確認するか、ロードマップで目標を追加できます。', 'empty'));
@@ -111,7 +111,7 @@ function reviewForm(s, w) {
 function weekView(s) {
   const starts = Object.keys(s.weeks).sort();
   const current = weekStart(today()), wk = viewedWeek, w = s.weeks[wk];
-  main.append(...heading('WEEKLY REVIEW', '今週を、見渡す。', `${dateLabel(wk)} 〜 ${dateLabel(addDays(wk, 6))} ・月曜始まり`));
+  main.append(...heading('今週を、見渡す。', `${dateLabel(wk)} 〜 ${dateLabel(addDays(wk, 6))} ・月曜始まり`));
   const idx = starts.indexOf(wk);
   const move = next => { viewedWeek = next; render(); };
   main.append(el('div', { class: 'week-controls' }, button('← 前の週', () => move(starts[idx - 1]), { disabled: idx <= 0 }), button('今週へ', () => move(current)), button('次の週 →', () => move(starts[idx + 1]), { disabled: idx < 0 || idx === starts.length - 1 || starts[idx + 1] > current })));
@@ -167,9 +167,9 @@ function goalDialog(old = null) {
   openDialog(old ? '目標を編集する' : '新しい目標', form);
 }
 function roadmapView(s, w) {
-  main.append(...heading('YOUR ROADMAP', 'これからに、道をつくる。', '目標を今週の行動へ。その先の一歩を、少しずつ。'));
+  main.append(...heading('これからに、道をつくる。', '目標を今週の行動へ。その先の一歩を、少しずつ。'));
   const age = ageAt(s.profile.birthYearMonth, today());
-  main.append(el('section', { class: 'hero' }, el('div', { class: 'eyebrow' }, '人生の時間軸 / 架空のサンプル'), el('h2', {}, '計画の目安'), p(`架空の生年月 1996年4月・現在位置 ${age}歳・設定年齢80歳までの区切り`, 'muted'), el('div', { class: 'timeline' }, el('small', {}, '1996'), el('progress', { max: 80, value: Math.min(80, Math.max(0, age)), 'aria-label': `架空の計画帯。現在位置${age}歳、設定年齢80歳。` }), el('small', {}, '2076')), el('div', { class: 'timeline-labels' }, s.goals.filter(g => g.targetMonth).map(g => el('span', {}, `${g.targetMonth} ${g.title}`))), p('年齢は計画の区切りです。実在の人の生年月は入力しません。', 'muted')));
+  main.append(el('section', { class: 'card overview' }, el('h2', {}, '計画の目安'), p('人生の時間軸 / 架空のサンプル', 'caption'), p(`架空の生年月 1996年4月・現在位置 ${age}歳・設定年齢80歳までの区切り`, 'muted'), el('div', { class: 'timeline' }, el('small', {}, '1996'), el('progress', { max: 80, value: Math.min(80, Math.max(0, age)), 'aria-label': `架空の計画帯。現在位置${age}歳、設定年齢80歳。` }), el('small', {}, '2076')), el('div', { class: 'timeline-labels' }, s.goals.filter(g => g.targetMonth).map(g => el('span', {}, `${g.targetMonth} ${g.title}`))), p('年齢は計画の区切りです。実在の人の生年月は入力しません。', 'muted')));
   main.append(button('＋ 目標を追加', () => goalDialog(), { class: 'primary', id: 'add-goal' }));
   if (!s.goals.length) main.append(p('目標はまだありません。最初の小さな一歩を追加しましょう。', 'empty'));
   for (const g of s.goals) {
