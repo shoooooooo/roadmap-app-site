@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#193e38">
+  <meta name="theme-color" content="#ffffff">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'none'; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>みちしるべ | 人生ロードマップ</title>
   <link rel="icon" href="data:,">
@@ -11,10 +11,14 @@
   <script type="module" src="js/app.mjs"></script>
 </head>
 <body>
-  <header class="site-header"><div class="brand"><span class="brand-mark" aria-hidden="true">↗</span><div><strong>みちしるべ</strong><small>小さな一歩を、これからにつなぐ</small></div></div><span class="local-badge">端末内に保存</span></header>
+  <header class="site-header"><div class="brand"><strong>みちしるべ</strong><small>小さな一歩を、これからにつなぐ</small></div><span class="local-note">端末内に保存</span></header>
   <div id="test-clock" class="notice" hidden></div>
   <div id="error" class="error" role="alert" hidden></div>
-  <nav aria-label="画面の切り替え"><button data-page="today" aria-current="page"><span aria-hidden="true">◉</span>今日</button><button data-page="week"><span aria-hidden="true">▦</span>今週</button><button data-page="roadmap"><span aria-hidden="true">↗</span>ロードマップ</button></nav>
+  <nav aria-label="画面の切り替え">
+    <button data-page="today" aria-current="page"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>今日</button>
+    <button data-page="week"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 10h18M8 14h2m4 0h2m-8 3h2m4 0h2"/></svg>今週</button>
+    <button data-page="roadmap"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 21V4m0 0c5-4 9 4 14 0v10c-5 4-9-4-14 0"/></svg>ロードマップ</button>
+  </nav>
   <main id="main"></main>
   <footer><details id="backup-panel"><summary>データの書き出し・復元</summary><p>このブラウザだけに保存しています。定期的にバックアップしてください。復元すると現在のデータ全体を置き換えます。</p><div class="actions"><button id="export">バックアップを書き出す</button><button id="raw-export">保存中の元データを出力</button></div><label class="file-label" for="restore-file">バックアップから復元（JSON・1MBまで）</label><input id="restore-file" type="file" accept="application/json,.json"><p id="backup-message" role="status"></p></details><p class="footnote">架空のサンプルから始める、あなたの計画帳。日本時間・月曜始まり。</p></footer>
   <div id="toast" role="status" aria-live="polite"></div>
