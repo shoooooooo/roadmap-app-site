@@ -3,6 +3,7 @@ import { initialState, backup, parseBackup, MAX_BYTES } from './schema.mjs';
 import { createStore } from './store.mjs';
 import { ensureWeek, buildWeek, suggestions, record, cancelRecord, dismiss, summary, saveReview, saveGoal, toggleMilestone } from './plan.mjs';
 import { el, button, p, field, selectField, statusLabel } from './views.mjs';
+import { mountCalendar } from './calendar-ui.mjs';
 
 const launched = Date.now();
 const param = new URLSearchParams(location.search).get('now');
@@ -13,6 +14,7 @@ if (param) { const b = document.querySelector('#test-clock'); b.hidden = false; 
 let storage;
 try { storage = localStorage; } catch { storage = { getItem() { throw new Error('端末内保存を利用できません'); } }; }
 const store = createStore(storage, now);
+let calendar = null;
 let page = 'today', viewedWeek = weekStart(today()), renderedDate = today(), toastTimer;
 const main = document.querySelector('#main'), errorNode = document.querySelector('#error');
 const dialog = document.querySelector('#dialog'), dialogContent = document.querySelector('#dialog-content');
@@ -192,6 +194,7 @@ function render() {
   if (store.safe) { error(store.error); main.append(p('安全モード：端末内データは上書きしません。画面下部の書き出し・復元を使ってください。', 'notice')); }
   if (page === 'today') todayView(s, w); else if (page === 'week') weekView(s); else roadmapView(s, w);
   if (store.safe) main.querySelectorAll('button,input,select,textarea').forEach(n => n.disabled = true);
+  calendar?.request('saved');
 }
 document.querySelectorAll('[data-page]').forEach(b => b.onclick = () => { page = b.dataset.page; render(); main.querySelector('h1')?.focus(); });
 function download(text, name) {
@@ -226,3 +229,4 @@ function refreshDate() {
 document.addEventListener('visibilitychange', refreshDate); window.addEventListener('focus', refreshDate); setInterval(refreshDate, 60000);
 if (!store.safe && !store.state.weeks[weekStart(today())]) store.commit(s => { ensureWeek(s, today()); });
 render(); if (store.error) error(store.error);
+calendar = mountCalendar({ storage, store, now, testClock: fixed !== null });
