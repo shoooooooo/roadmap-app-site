@@ -138,6 +138,10 @@ nav button { display: flex; flex: 1; flex-direction: column; align-items: center
 nav button[aria-current=page] { color: var(--accent); font-weight: 600; }
 nav svg { flex-shrink: 0; }
 [hidden] { display: none !important; }
+.calendar-section { width: min(100% - 32px, 720px); margin: 0 auto 120px; color: var(--secondary); font-size: 13px; }
+.calendar-section summary { min-height: 44px; cursor: pointer; padding: 12px 0; }
+.calendar-section p { overflow-wrap: anywhere; }
+#calendar-controls .actions { flex-wrap: wrap; }
 
 @media (min-width: 768px) {
   .site-header { padding-top: 40px; padding-bottom: 40px; }
