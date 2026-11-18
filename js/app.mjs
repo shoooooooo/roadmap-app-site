@@ -89,7 +89,9 @@ function todayView(s, w) {
     el('div', { class: 'card overview' }, el('h2', {}, completed.length ? `今日は${completed.length}件、記録できました` : 'まずは、できそうなことから'), p('記録はこの端末のブラウザ内に保存されます。', 'muted')),
     el('div', { class: 'section-heading' }, el('h2', {}, '今日の候補'), el('small', {}, '日本時間')));
   for (const item of list) main.append(candidate(item, w));
-  if (!list.length) main.append(p('いまの候補はありません。今週の記録を確認するか、ロードマップで目標を追加できます。', 'empty'));
+  if (!list.length) main.append(el('div', { class: 'empty' },
+    p('いまの候補はありません。今週の記録を確認するか、ロードマップで目標を追加できます。'),
+    button('目標のロードマップを開く', () => showPage('roadmap'), { class: 'primary', id: 'open-roadmap' })));
   if (completed.length) {
     main.append(el('h2', {}, '今日の記録'));
     for (const item of completed) main.append(el('article', { class: 'card' }, el('h3', {}, item.title), p(statusLabel(w.records[item.id]), 'status'), button('記録を取り消す', () => cancel(item))));
@@ -186,7 +188,7 @@ function roadmapView(s, w) {
     card.append(chain); main.append(card);
   }
 }
-function render() {
+function render({ syncCalendar = true } = {}) {
   renderedDate = today();
   const s = store.state, wk = weekStart(today()), w = s.weeks[wk] || buildWeek(s, wk);
   main.replaceChildren();
@@ -194,9 +196,14 @@ function render() {
   if (store.safe) { error(store.error); main.append(p('安全モード：端末内データは上書きしません。画面下部の書き出し・復元を使ってください。', 'notice')); }
   if (page === 'today') todayView(s, w); else if (page === 'week') weekView(s); else roadmapView(s, w);
   if (store.safe) main.querySelectorAll('button,input,select,textarea').forEach(n => n.disabled = true);
-  calendar?.request('saved');
+  if (syncCalendar) calendar?.request('saved');
 }
-document.querySelectorAll('[data-page]').forEach(b => b.onclick = () => { page = b.dataset.page; render(); main.querySelector('h1')?.focus(); });
+function showPage(next) {
+  page = next;
+  render({ syncCalendar: false });
+  main.querySelector('h1')?.focus();
+}
+document.querySelectorAll('[data-page]').forEach(b => b.onclick = () => showPage(b.dataset.page));
 function download(text, name) {
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
   const a = el('a', { href: url, download: name }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
