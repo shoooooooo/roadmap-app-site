@@ -1,20 +1,37 @@
 import { CALENDAR_SCOPE } from './calendar-config.mjs';
+const gisByDocument = new WeakMap();
+export function prepareGoogleIdentity(win, doc) {
+  if (win.google?.accounts?.oauth2) return Promise.resolve();
+  if (!gisByDocument.has(doc)) gisByDocument.set(doc, new Promise((resolve, reject) => {
+    const script = doc.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    const fail = () => {
+      clearTimeout(timer);
+      script.remove();
+      gisByDocument.delete(doc);
+      reject(new Error('gis-unavailable'));
+    };
+    const timer = setTimeout(fail, 15000);
+    script.onload = () => {
+      if (!win.google?.accounts?.oauth2) { fail(); return; }
+      clearTimeout(timer);
+      resolve();
+    };
+    script.onerror = fail;
+    doc.head.append(script);
+  }));
+  return gisByDocument.get(doc);
+}
+
 // Nothing in this closure is persisted, exported to a backup, or logged.
 export function createGoogleAuth({ clientId, now = () => Date.now(), window: win = globalThis.window, document: doc = globalThis.document }) {
-  let access = null, expires = 0, client = null, loading = null, active = 0;
+  let access = null, expires = 0, client = null, active = 0;
   function clear() { access = null; expires = 0; active++; }
   const token = () => access && now() < expires ? access : null;
   async function prepare() {
     if (!clientId) throw new Error('unconfigured');
-    if (win.google?.accounts?.oauth2) return;
-    if (!loading) loading = new Promise((resolve, reject) => {
-      const script = doc.createElement('script'); script.src = 'https://accounts.google.com/gsi/client'; script.async = true;
-      const timer = setTimeout(() => { script.remove(); loading = null; reject(new Error('gis-unavailable')); }, 15000);
-      script.onload = () => { clearTimeout(timer); if (win.google?.accounts?.oauth2) resolve(); else { loading = null; reject(new Error('gis-unavailable')); } };
-      script.onerror = () => { clearTimeout(timer); script.remove(); loading = null; reject(new Error('gis-unavailable')); };
-      doc.head.append(script);
-    });
-    await loading;
+    await prepareGoogleIdentity(win, doc);
   }
   function signIn() {
     const oauth = win.google?.accounts?.oauth2;

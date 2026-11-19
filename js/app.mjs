@@ -4,6 +4,8 @@ import { createStore } from './store.mjs';
 import { ensureWeek, buildWeek, suggestions, record, cancelRecord, dismiss, summary, saveReview, saveGoal, toggleMilestone } from './plan.mjs';
 import { el, button, p, field, selectField, statusLabel } from './views.mjs';
 import { mountCalendar } from './calendar-ui.mjs';
+import { mountHealth } from './health-ui.mjs';
+import { readMeta } from './calendar-meta.mjs';
 
 const launched = Date.now();
 const params = new URLSearchParams(location.search);
@@ -238,3 +240,9 @@ document.addEventListener('visibilitychange', refreshDate); window.addEventListe
 if (!store.safe && !store.state.weeks[weekStart(today())]) store.commit(s => { ensureWeek(s, today()); });
 render(); if (store.error) error(store.error);
 calendar = mountCalendar({ storage, store, now, testClock: params.has('now') });
+mountHealth({
+  testClock: params.has('now'),
+  calendarClientId() {
+    try { return readMeta(storage).meta.clientId; } catch { return ''; }
+  },
+});

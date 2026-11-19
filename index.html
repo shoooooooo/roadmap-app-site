@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://www.googleapis.com/calendar/v3/ https://accounts.google.com/gsi/ https://oauth2.googleapis.com/revoke; img-src 'self' data:; style-src 'self' https://accounts.google.com/gsi/style; script-src 'self' https://accounts.google.com/gsi/client; frame-src https://accounts.google.com/gsi/; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://health.googleapis.com/v4/users/me/ https://www.googleapis.com/calendar/v3/ https://accounts.google.com/gsi/ https://oauth2.googleapis.com/revoke; img-src 'self' data:; style-src 'self' https://accounts.google.com/gsi/style; script-src 'self' https://accounts.google.com/gsi/client; frame-src https://accounts.google.com/gsi/; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>みちしるべ | 人生ロードマップ</title>
   <link rel="icon" href="data:,">
@@ -24,6 +24,7 @@
   <main id="main"></main>
   <footer><details id="backup-panel"><summary>データの書き出し・復元</summary><p>このブラウザだけに保存しています。定期的にバックアップしてください。復元すると現在のデータ全体を置き換えます。</p><div class="actions"><button id="export">バックアップを書き出す</button><button id="raw-export">保存中の元データを出力</button></div><label class="file-label" for="restore-file">バックアップから復元（JSON・1MBまで）</label><input id="restore-file" type="file" accept="application/json,.json"><p id="backup-message" role="status"></p></details><p class="footnote">架空のサンプルから始める、あなたの計画帳。日本時間・月曜始まり。</p></footer>
   <section class="calendar-section" aria-label="カレンダー連携"><p id="calendar-status" role="status" aria-live="polite">カレンダー未接続</p><details id="calendar-panel"><summary>Googleカレンダー連携</summary><p>本人が所有する既存の副カレンダー「人生ロードマップ」に、今日・今週の予定を反映します。同期元は一台のブラウザに決め、スマートフォンではGoogleカレンダーから閲覧してください。</p><p>送るのは予定名・分数・日付です。メモと過去の実施記録は送りません。トークンは保存せず、期限切れや開き直し後は再接続が必要です。オフライン中も記録でき、アプリを開いて有効な接続が戻ると同期します。</p><div id="calendar-controls"></div></details></section>
+  <section class="health-section" aria-label="健康データ連携"><details id="health-panel"><summary>Google Healthの記録を読む</summary></details></section>
   <div id="toast" role="status" aria-live="polite"></div>
   <dialog id="dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div><button id="dialog-close" class="quiet">閉じる</button></dialog>
 </body>
