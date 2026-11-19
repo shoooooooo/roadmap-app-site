@@ -169,6 +169,9 @@ nav svg { flex-shrink: 0; }
 .health-dates input { min-width: 0; max-width: 100%; }
 .health-record, #health-track:not(:empty) { background: var(--surface); border-radius: 12px; margin: 12px 0; padding: 12px; }
 .health-record h4 { margin: 0; }
+.health-latest p { margin: 4px 0 0; }
+.health-latest-value { display: flex; flex-wrap: wrap; gap: 4px 12px; font-weight: 600; }
+.health-note { color: var(--secondary); font-size: .875rem; }
 .health-section dt { font-weight: 600; }
 .health-section dd { margin: 0 0 8px; overflow-wrap: anywhere; }
 .health-section li { overflow-wrap: anywhere; }

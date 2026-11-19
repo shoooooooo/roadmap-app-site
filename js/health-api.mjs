@@ -122,9 +122,11 @@ function retryTime(value) {
   const delay = /^\d+$/.test(value ?? '') ? Number(value) * 1000 : Date.parse(value) - now;
   return now + (Number.isFinite(delay) && delay >= 0 ? Math.max(1000, delay) : 5000);
 }
-export function healthReader(access, signal) {
+export function healthReader(access, signal, current = () => true) {
   const budget = { remaining: JSON_LIMIT };
   async function request(address, body, tcx = false) {
+    signal.throwIfAborted();
+    if (!current()) throw new HealthError('interrupted');
     const headers = { Authorization: 'Bearer ' + access, Accept: tcx ? 'application/tcx+xml' : 'application/json' };
     if (body) headers['Content-Type'] = 'application/json';
     const deadline = AbortSignal.timeout(20000);

@@ -117,6 +117,101 @@ export function renderHealthRows(target, entry, result, selectTrack) {
   }
 }
 
+function latestTime(entry, value, raw) {
+  if (entry.time === 'daily' || entry.time === 'rollup') {
+    const day = measureTime(entry, value, raw);
+    return { day, when: '' };
+  }
+  const sample = value.sampleTime;
+  const interval = value.interval;
+  const [local, physical, offset] = entry.time === 'sleep' ?
+    [interval?.civilEndTime, interval?.endTime, interval?.endUtcOffset] :
+    [sample?.civilTime, sample?.physicalTime, sample?.utcOffset];
+  const parts = typeof physical === 'string' &&
+    /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?(Z|[+-]\d\d:\d\d)$/.exec(physical);
+  const ms = parts ? Date.parse(parts[1] + parts[3]) : NaN;
+  const instant = Number.isFinite(ms) ? BigInt(ms) * 1_000_000n + BigInt((parts[2] ?? '').padEnd(9, '0')) : null;
+  const shifted = timestamp(physical, offset);
+  const recorded = shifted.endsWith('（記録地）') ? shifted.slice(0, 19) : '';
+  const day = date(local?.date) || recorded.slice(0, 10);
+  const hasTime = local?.time && typeof local.time === 'object' && !Array.isArray(local.time);
+  const nanos = local?.time?.nanos ?? 0;
+  const localTime = hasTime && Number.isInteger(nanos) && nanos >= 0 && nanos < 1e9 && civil(local);
+  const when = localTime || (day && recorded.startsWith(day) ? recorded : '');
+  const fraction = localTime ? String(nanos).padStart(9, '0') : (parts?.[2] ?? '').padEnd(9, '0');
+  return { day, when, key: when ? when + '.' + fraction : '', instant };
+}
+
+export function latestHealth(entry, result, range) {
+  const candidates = [], notes = [];
+  let unknownDate = false;
+  for (const raw of result.rows) {
+    const value = raw[entry.key];
+    if (entry.time === 'rollup' && !entry.fields.some(field => get(value, field.path) != null)) continue;
+    const time = latestTime(entry, value ?? {}, raw);
+    if (!time.day) unknownDate = true;
+    else if (time.day >= range.start && time.day < range.end) candidates.push({ ...time, value: value ?? {} });
+  }
+  if (result.truncated) notes.push('取得上限に達したため最新未確認');
+  if (unknownDate) notes.push('日時不明の記録があるため最新未確認');
+  if (!candidates.length) return { rows: [], notes };
+
+  const allInstants = candidates.every(row => row.instant != null);
+  let chosen;
+  let differentPrecision = false;
+  if (allInstants) {
+    const newest = candidates.reduce((a, b) => a.instant >= b.instant ? a : b).instant;
+    chosen = candidates.filter(row => row.instant === newest);
+  } else {
+    const day = candidates.map(row => row.day).sort().at(-1);
+    const sameDay = candidates.filter(row => row.day === day);
+    const key = sameDay.map(row => row.key ?? '').sort().at(-1);
+    chosen = sameDay.filter(row => !row.key || row.key === key);
+    differentPrecision = key !== '' && chosen.some(row => !row.when);
+    if (candidates.some(row => row.instant != null)) notes.push('記録の時刻の基準がそろわないため最新未確認');
+    if (differentPrecision) notes.push('同じ日の時刻が不明な記録があるため最新未確認');
+  }
+  const fields = entry.time === 'sleep' ? entry.fields.filter(field => field.path === 'summary.minutesAsleep') : entry.fields;
+  const rows = [...new Map(chosen.map(row => {
+    const values = fields.map(field => [field, get(row.value, field.path)]);
+    const nap = entry.time === 'sleep' && row.value.metadata?.mainSleep === false;
+    const identity = JSON.stringify([row.day, row.when, values.map(([, value]) => numeric(value) ?? value), nap]);
+    return [identity, { day: row.day, when: row.when, values, nap }];
+  })).values()];
+  if (rows.length > 1 && !differentPrecision) {
+    notes.push(entry.time === 'daily' || entry.time === 'rollup' ? '同じ日に複数の値' :
+      rows.every(row => row.when) ? '同時刻に複数の値' : '日時を区別できない複数の値');
+  }
+  const shown = rows.slice(0, 3);
+  if (rows.length > shown.length) notes.push('候補は最大3件表示');
+  return { rows: shown, notes };
+}
+
+export function renderHealthList(target, readings, range) {
+  target.replaceChildren(...readings.map(({ entry, result, message }) => {
+    const card = el('article', { class: 'health-record health-latest', 'data-health-latest': entry.id }, el('h4', {}, entry.label));
+    if (message) {
+      card.append(el('p', {}, message));
+      return card;
+    }
+    const { rows, notes } = latestHealth(entry, result, range);
+    for (const note of notes) card.append(el('p', { class: 'health-note' }, note));
+    if (!rows.length && !notes.length) card.append(el('p', {}, '期間内に記録なし'));
+    for (const { day, when, values, nap } of rows) {
+      const time = entry.time === 'sleep' ? '起床 ' : '';
+      const precision = when ? '（記録地）' : ['daily', 'rollup'].includes(entry.time) ? '（日別）' : '（時刻なし）';
+      const reading = values.map(([field, value]) => {
+        const prefix = entry.time === 'sleep' ? '実睡眠 ' : values.length > 1 ? field.label + ' ' : '';
+        return el('span', {}, prefix + format(value, field));
+      });
+      card.append(el('p', { class: 'health-latest-value' }, ...reading),
+        el('p', { class: 'health-note' }, time + (when || day) + precision));
+      if (nap) card.append(el('p', { class: 'health-note' }, '主な睡眠ではない記録（昼寝など）'));
+    }
+    return card;
+  }));
+}
+
 export function renderTrack(target, result) {
   target.replaceChildren(el('h4', {}, '運動のGPS経路'));
   if (!result.points.length) target.append(el('p', {}, '表示できる位置記録がありません。'));

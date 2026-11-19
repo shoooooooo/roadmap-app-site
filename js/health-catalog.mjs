@@ -122,3 +122,24 @@ export const gps = Object.freeze({ ...metrics.find(({ id }) => id === 'exercise'
   label: '運動を選んでGPS経路を表示', scopes: [activity, 'location'], gps: true });
 
 export const catalog = Object.freeze([...metrics, ...resources, gps]);
+
+export const defaultListIds = ['weight', 'sleep', 'steps', 'daily-resting-heart-rate'];
+export const listLimit = 8;
+
+export function listEligible(entry) {
+  return !entry.gps && ['reconcile', 'dailyRollUp'].includes(entry.mode) &&
+    ['sample', 'daily', 'rollup', 'sleep'].includes(entry.time) && !entry.latest &&
+    entry.id !== 'blood-glucose' &&
+    (entry.time === 'sleep' || entry.fields.every(field => !field.fields));
+}
+
+export function listRequest(entry) {
+  if (entry.time !== 'sleep') return entry;
+  return {
+    ...entry, dateField: undefined,
+    fields: [
+      entry.fields.find(field => field.path === 'summary.minutesAsleep'),
+      ...['metadata.mainSleep', 'interval.civilEndTime', 'interval.endTime', 'interval.endUtcOffset'].map(path => ({ path })),
+    ],
+  };
+}
