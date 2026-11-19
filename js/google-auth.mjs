@@ -27,7 +27,7 @@ export function createGoogleAuth({ clientId, now = () => Date.now(), window: win
         client = oauth.initTokenClient({ client_id: clientId, scope: CALENDAR_SCOPE, include_granted_scopes: false,
           callback: response => {
             if (active !== generation) { fail('sign-in-cancelled'); return; }
-            if (response?.error || !response?.access_token || !oauth.hasGrantedAllScopes(response, CALENDAR_SCOPE)) { clear(); fail('permission'); return; }
+            if (response?.error || !response?.access_token || typeof response.scope !== 'string' || response.scope.trim() !== CALENDAR_SCOPE) { fail('permission'); return; }
             if (!Number.isFinite(Number(response.expires_in)) || Number(response.expires_in) <= 60) { clear(); fail('needs-sign-in'); return; }
             access = response.access_token; expires = now() + (Number(response.expires_in) - 60) * 1000; clearTimeout(timer); resolve();
           }, error_callback: () => fail('sign-in-cancelled') });

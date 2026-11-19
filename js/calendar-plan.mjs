@@ -1,12 +1,15 @@
 import { weekStart, addDays, validDate } from './date-jst.mjs';
+import { strongEtag } from './calendar-api.mjs';
 
 export const validSyncKey = key => typeof key === 'string' && /^(item:[a-z0-9-]{1,50}|float:\d{4}-\d\d-\d\d:[a-z0-9-]{1,50}:(any|weekend))$/.test(key);
 // Injective base32hex encoding, using only Calendar's permitted ID alphabet.
-export function eventIdFor(key, generation = 0) {
+export function eventIdFor(key, generation = 0, writer = '') {
   if (!validSyncKey(key)) throw new Error('invalid sync key');
   if (!Number.isSafeInteger(generation) || generation < 0 || generation > 10000) throw new Error('invalid generation');
-  const alphabet = '0123456789abcdefghijklmnopqrstuv'; let bits = 0, value = 0, out = 'rm1';
-  for (const byte of new TextEncoder().encode(`${key}#${generation}`)) {
+  if (generation && !/^[a-f0-9]{32}$/.test(writer)) throw new Error('invalid writer');
+  const alphabet = '0123456789abcdefghijklmnopqrstuv'; let bits = 0, value = 0, out = 'rm2';
+  const identity = generation ? `${key}#${generation}#${writer}` : key;
+  for (const byte of new TextEncoder().encode(identity)) {
     value = (value << 8) | byte; bits += 8;
     while (bits >= 5) { bits -= 5; out += alphabet[(value >>> bits) & 31]; }
   }
@@ -15,19 +18,29 @@ export function eventIdFor(key, generation = 0) {
 }
 // Compare the full canonical content, avoiding probabilistic hash collisions.
 export const signature = body => JSON.stringify([body.summary, body.start?.date, body.end?.date]);
-export function ownedEvent(body) {
-  const key = body?.extendedProperties?.private?.key;
-  const gen = body?.extendedProperties?.private?.generation;
-  return validSyncKey(key) && typeof gen === 'string' && /^(0|[1-9]\d{0,4})$/.test(gen) && Number(gen) <= 10000 && body.extendedProperties.private.app === 'roadmap-app' && body.id === eventIdFor(key, Number(gen)) && validDate(body.start?.date) && validDate(body.end?.date) && body.start.date < body.end.date && typeof body.summary === 'string' && body.summary.length <= 500;
+export function ownedEvent(body, writer) {
+  const mark = body?.extendedProperties?.private;
+  return mark?.app === 'roadmap-app' && mark.schema === '2' && mark.writer === writer &&
+    typeof writer === 'string' && /^[a-f0-9]{32}$/.test(writer) &&
+    typeof mark.op === 'string' && /^[a-f0-9]{32}$/.test(mark.op) &&
+    validSyncKey(mark.key) && typeof mark.generation === 'string' && /^(0|[1-9]\d{0,4})$/.test(mark.generation) &&
+    Number(mark.generation) <= 10000 && body.id === eventIdFor(mark.key, Number(mark.generation), writer) &&
+    validDate(body.start?.date) && validDate(body.end?.date) && body.start.date < body.end.date &&
+    typeof body.summary === 'string' && body.summary.length <= 500;
 }
+export function confirmedEvent(body, writer, key, id) {
+  return ownedEvent(body, writer) && body.id === id && body.extendedProperties.private.key === key &&
+    body.status === 'confirmed' && !body.recurrence && !body.recurringEventId && strongEtag(body.etag);
+}
+export const keyInWeek = (key, week) => key.startsWith(`item:w${week.replaceAll('-', '')}-`) || key.startsWith(`float:${week}:`);
 export function desiredEvents(state, today) {
   const wk = weekStart(today), w = state.weeks[wk];
   if (!w) return null;
   const result = new Map(), groups = new Map(), sunday = addDays(wk, 6);
   function add(key, summary, first, last) {
     if (first > last) return;
-    const body = { id: eventIdFor(key), summary, description: 'みちしるべから自動同期した今日・今週の予定です。変更はアプリで行ってください。', start: { date: first }, end: { date: addDays(last, 1) }, status: 'confirmed', transparency: 'transparent', reminders: { useDefault: false }, extendedProperties: { private: { app: 'roadmap-app', key } } };
-    body.extendedProperties.private.generation = '0'; result.set(key, body);
+    const body = { summary, description: 'みちしるべから自動同期した今日・今週の予定です。変更はアプリで行ってください。', start: { date: first }, end: { date: addDays(last, 1) }, status: 'confirmed', transparency: 'transparent', reminders: { useDefault: false }, extendedProperties: { private: { app: 'roadmap-app', key } } };
+    result.set(key, body);
   }
   for (const item of w.items) {
     const r = w.records[item.id], key = `item:${item.id}`;
@@ -60,7 +73,7 @@ export function diffEvents(desired, mapped, today) {
   for (const [key, body] of desired) {
     const old = mapped[key];
     // An ended incarnation stays untouched, but its key may be planned again today.
-    if (!old || old.end <= today || old.signature !== signature(body)) writes.push({ kind: old && old.end > today ? 'update' : 'insert', key, id: body.id, body });
+    if (!old || old.end <= today || old.signature !== signature(body)) writes.push({ kind: old && old.end > today ? 'update' : 'insert', key, body });
   }
   return [...deletes, ...writes];
 }

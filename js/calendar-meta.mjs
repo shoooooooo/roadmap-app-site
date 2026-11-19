@@ -1,29 +1,44 @@
-import { eventIdFor, validSyncKey } from './calendar-plan.mjs';
-import { validDate, weekStart } from './date-jst.mjs';
-export const META_KEY = 'roadmap-app.calendar-sync.v1';
-export const emptyMeta = () => ({ version: 1, enabled: false, calendarId: null, knownCalendars: [], creation: null, events: {}, generations: {}, generationWeek: null });
-const object = o => o && typeof o === 'object' && !Array.isArray(o);
-const exact = (o, names) => object(o) && Object.keys(o).sort().join(' ') === names.split(' ').sort().join(' ');
-const calendarId = id => typeof id === 'string' && /^[A-Za-z0-9._%+@-]{1,255}$/.test(id);
+import { validCalendarId, validClientId } from './calendar-config.mjs';
+import { strongEtag } from './calendar-api.mjs';
+import { eventIdFor, validSyncKey, ownedEvent } from './calendar-plan.mjs';
+import { validDate } from './date-jst.mjs';
+
+export const META_KEY = 'roadmap-app.calendar-sync.v2';
+export const CHECKPOINT_KEY = META_KEY + '.checkpoint';
+export const nonce = () => crypto.randomUUID().replaceAll('-', '');
+export const validNonce = value => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
+export const emptyMeta = () => ({ version: 2, clientId: '', calendarId: '', binding: null, writer: null,
+  enabled: false, hold: null, records: {}, pending: null });
+const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+const exact = (v, keys) => object(v) && Object.keys(v).sort().join(' ') === keys;
+const validGeneration = n => Number.isInteger(n) && n >= 0 && n <= 10000;
+
 export function validateMeta(m) {
-  const fail = () => { throw new Error('meta-corrupt'); };
-  function safe(v, depth = 0) {
-    if (depth > 8) fail();
-    if (object(v) || Array.isArray(v)) for (const k of Object.keys(v)) { if (['__proto__', 'constructor', 'prototype'].includes(k)) fail(); safe(v[k], depth + 1); }
+  const corrupt = () => { throw new Error('meta-corrupt'); };
+  if (!exact(m, 'binding calendarId clientId enabled hold pending records version writer') || m.version !== 2 ||
+      typeof m.enabled !== 'boolean' || ![null, 'remote', 'collision'].includes(m.hold)) corrupt();
+  if (!object(m.records) || Object.keys(m.records).length > 1000) corrupt();
+  if (!m.binding) {
+    if (m.binding !== null || m.clientId !== '' || m.calendarId !== '' || m.writer !== null || m.enabled ||
+        m.pending !== null || m.hold !== null || Object.keys(m.records).length) corrupt();
+    return m;
   }
-  safe(m);
-  if (!exact(m, 'version enabled calendarId knownCalendars creation events generations generationWeek') || m.version !== 1 || typeof m.enabled !== 'boolean' || !(m.calendarId === null || calendarId(m.calendarId))) fail();
-  if (m.generationWeek !== null && (!validDate(m.generationWeek) || weekStart(m.generationWeek) !== m.generationWeek)) fail();
-  if (!Array.isArray(m.knownCalendars) || m.knownCalendars.length > 3 || new Set(m.knownCalendars).size !== m.knownCalendars.length || !m.knownCalendars.every(calendarId) || (m.calendarId && !m.knownCalendars.includes(m.calendarId))) fail();
-  if (m.creation !== null && !['in-flight', 'ambiguous'].includes(m.creation)) fail();
-  if (!object(m.events) || Object.keys(m.events).length > 1000) fail();
-  if (!object(m.generations) || Object.keys(m.generations).length > 1000) fail();
-  for (const [key, gen] of Object.entries(m.generations)) if (!validSyncKey(key) || !Number.isSafeInteger(gen) || gen < 0 || gen > 10000) fail();
-  for (const [key, entry] of Object.entries(m.events)) {
-    if (!validSyncKey(key) || !exact(entry, 'id signature first end') || entry.id !== eventIdFor(key, m.generations[key] || 0) || typeof entry.signature !== 'string' || entry.signature.length > 1000 || !validDate(entry.first) || !validDate(entry.end) || entry.first >= entry.end) fail();
+  if (!validNonce(m.binding) || !validNonce(m.writer) || !validClientId(m.clientId) || !validCalendarId(m.calendarId)) corrupt();
+  for (const [key, r] of Object.entries(m.records)) {
+    if (!validSyncKey(key) || !exact(r, 'end etag generation id retired') || !validGeneration(r.generation) ||
+        r.id !== eventIdFor(key, r.generation, m.writer) || !validDate(r.end) ||
+        typeof r.retired !== 'boolean' || !(r.etag === null || strongEtag(r.etag))) corrupt();
   }
-  return structuredClone(m);
+  const op = m.pending;
+  if (op !== null) {
+    if (!exact(op, 'body etag generation id key kind') || !['insert', 'update', 'delete'].includes(op.kind) ||
+        !validSyncKey(op.key) || !validGeneration(op.generation) || op.id !== eventIdFor(op.key, op.generation, m.writer) ||
+        (op.kind === 'insert' ? op.etag !== null : !strongEtag(op.etag))) corrupt();
+    if (op.kind === 'delete' ? op.body !== null : !ownedEvent(op.body, m.writer) || op.body.id !== op.id) corrupt();
+  }
+  return m;
 }
+
 export function readMeta(storage) {
   let raw;
   try { raw = storage.getItem(META_KEY); } catch { throw new Error('storage-unavailable'); }
@@ -31,12 +46,25 @@ export function readMeta(storage) {
   if (raw.length > 1000000) throw new Error('meta-corrupt');
   try { return { raw, meta: validateMeta(JSON.parse(raw)) }; } catch { throw new Error('meta-corrupt'); }
 }
+
 export function writeMeta(storage, meta, previous) {
   const text = JSON.stringify(validateMeta(meta));
   try {
     if (storage.getItem(META_KEY) !== previous) throw new Error();
-    storage.setItem(META_KEY, text);
+    if (previous !== text) storage.setItem(META_KEY, text);
     if (storage.getItem(META_KEY) !== text) throw new Error();
   } catch { throw new Error('meta-write-failed'); }
   return text;
+}
+
+export function checkpointMatches(storage, raw) {
+  return raw !== null && storage.getItem(CHECKPOINT_KEY) === raw;
+}
+
+export function acceptCheckpoint(storage, raw, mainKey) {
+  if (raw === null || storage.getItem(mainKey) !== raw) throw new Error('paused-local');
+  try {
+    storage.setItem(CHECKPOINT_KEY, raw);
+    if (storage.getItem(CHECKPOINT_KEY) !== raw) throw new Error();
+  } catch { throw new Error('meta-write-failed'); }
 }

@@ -6,11 +6,12 @@ import { el, button, p, field, selectField, statusLabel } from './views.mjs';
 import { mountCalendar } from './calendar-ui.mjs';
 
 const launched = Date.now();
-const param = new URLSearchParams(location.search).get('now');
+const params = new URLSearchParams(location.search);
+const param = params.get('now');
 const fixed = param && /(?:Z|[+-]\d\d:\d\d)$/.test(param) && Number.isFinite(Date.parse(param)) ? Date.parse(param) : null;
 const now = () => (fixed === null ? Date.now() : fixed + Date.now() - launched);
 const today = () => todayJst(now());
-if (param) { const b = document.querySelector('#test-clock'); b.hidden = false; b.textContent = fixed === null ? 'テスト時刻の形式が不正です。通常の日本時間を使います。' : `テスト時刻で表示中: ${param}（日本時間）`; }
+if (params.has('now')) { const b = document.querySelector('#test-clock'); b.hidden = false; b.textContent = fixed === null ? 'テスト時刻の形式が不正です。通常の日本時間を使います。' : `テスト時刻で表示中: ${param}（日本時間）`; }
 let storage;
 try { storage = localStorage; } catch { storage = { getItem() { throw new Error('端末内保存を利用できません'); } }; }
 const store = createStore(storage, now);
@@ -236,4 +237,4 @@ function refreshDate() {
 document.addEventListener('visibilitychange', refreshDate); window.addEventListener('focus', refreshDate); setInterval(refreshDate, 60000);
 if (!store.safe && !store.state.weeks[weekStart(today())]) store.commit(s => { ensureWeek(s, today()); });
 render(); if (store.error) error(store.error);
-calendar = mountCalendar({ storage, store, now, testClock: fixed !== null });
+calendar = mountCalendar({ storage, store, now, testClock: params.has('now') });

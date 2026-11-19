@@ -1,58 +1,113 @@
-import { GOOGLE_CLIENT_ID, ALLOW_TEST_CLOCK } from './calendar-config.mjs';
 import { createGoogleAuth } from './google-auth.mjs';
 import { createCalendarApi } from './calendar-api.mjs';
+import { readMeta, META_KEY } from './calendar-meta.mjs';
 import { createCalendarSync } from './calendar-sync.mjs';
-import { el, button, p } from './views.mjs';
+import { el, button, field, p } from './views.mjs';
 
 const messages = {
   off: 'カレンダー未接続', unconfigured: 'カレンダー未設定', 'test-clock': 'テスト時刻では連携できません',
   loading: 'Googleの接続準備中', ready: 'Googleでログインできます', 'signing-in': 'Googleで接続中',
   syncing: 'カレンダーへ同期中', synced: 'カレンダー同期済み', offline: 'オフライン・後で同期します',
-  backoff: '通信待ち・自動で再試行します', 'sync-error': '同期エラー・再試行してください',
+  backoff: '通信または予定の変更を確認し、再試行します', 'sync-error': '同期エラー・再試行してください',
   'needs-sign-in': '再接続が必要です', permission: 'カレンダーの許可を確認してください',
-  'binding-lost': '接続先カレンダーを確認できません', 'creation-ambiguous': 'カレンダー作成の結果を確認できません',
+  'binding-lost': '入力したIDのカレンダー名と所有権を確認できません',
   'meta-corrupt': '連携情報を読めません', 'meta-write-failed': '連携情報を保存できません',
-  'storage-unavailable': '端末の保存領域を利用できません', 'paused-local': '端末内データの確認が必要です。再読込してください',
+  'storage-unavailable': '端末の保存領域を利用できません', 'paused-local': '端末内データを確認し、再読込してください',
+  'locks-unavailable': 'このブラウザでは同期の排他制御を利用できません',
   'other-tab': '別のタブで同期中', integrity: '予定の対応を確認できません。同期を停止しました',
+  changed: 'Google側で変更が続いた予定を保留しました',
+  continuity: '復元または端末内データの変更を検出し、同期を保留しました',
+  remote: '以前の連携または別の端末の予定を検出し、同期を保留しました',
+  collision: '以前の予定の削除または反映を確認できず、同期を保留しました',
+  'review-resume': '現在の計画で同期を再開する内容を確認してください',
+  'invalid-client': 'ウェブ用クライアントIDの形式を確認してください',
+  'invalid-calendar': 'Googleカレンダーの設定から副カレンダーIDをコピーしてください',
   'api-error': '予定を反映できません。設定を確認してください', 'gis-unavailable': 'Googleの接続準備に失敗しました',
   disconnecting: '接続を解除中', 'revoke-unconfirmed': '端末の接続を解除しました。Google側の許可取消は未確認です'
 };
+
 export function mountCalendar({ storage, store, now, testClock }) {
-  const panel = document.querySelector('#calendar-controls'), short = document.querySelector('#calendar-status'), alert = document.querySelector('#sync-alert');
-  const auth = createGoogleAuth({ clientId: GOOGLE_CLIENT_ID, now });
-  const api = createCalendarApi({ getToken: auth.token });
-  let ready = false, engine;
-  async function prepare() {
-    display('loading');
-    try { await auth.prepare(); ready = true; display('ready'); }
-    catch { display('gis-unavailable'); }
+  const panel = document.querySelector('#calendar-controls'), short = document.querySelector('#calendar-status');
+  const alert = document.querySelector('#sync-alert');
+  const inputAttrs = { type: 'text', autocomplete: 'off', spellcheck: 'false', autocapitalize: 'none', maxlength: 255, required: true };
+  const clientField = field('ウェブ用 OAuth クライアントID', 'calendar-client-id', inputAttrs);
+  const calendarField = field('人生ロードマップの副カレンダーID', 'calendar-target-id', inputAttrs);
+  const client = clientField.querySelector('input'), target = calendarField.querySelector('input');
+  const save = el('button', { type: 'submit', class: 'primary' }, '連携設定を保存');
+  const form = el('form', { autocomplete: 'off', onsubmit: event => {
+    event.preventDefault();
+    void engine.configure(client.value, target.value);
+  } }, clientField, calendarField, el('div', { class: 'actions' }, save));
+  const stateText = p('', 'status'), actions = el('div', { class: 'actions' }), help = el('div');
+  panel.replaceChildren(form, stateText, actions, help);
+
+  function loadSettings() {
+    try {
+      const { meta } = readMeta(storage);
+      client.value = meta.clientId;
+      target.value = meta.calendarId;
+    } catch { /* The status renders the storage error. */ }
   }
-  function display(code) {
+
+  function display(code, detail) {
     const message = messages[code] || messages['sync-error'];
     short.textContent = message; short.dataset.state = code;
-    const actions = el('div', { class: 'actions' });
-    const blocked = ['unconfigured', 'test-clock', 'storage-unavailable'].includes(code);
-    if (code === 'meta-corrupt') actions.append(button('連携情報をリセット', () => {
-      if (confirm('連携情報だけをリセットします。古いカレンダーは自動発見できず、再接続で新しく作ります。古いカレンダーはGoogle側で整理してください。端末の記録は残ります。')) void engine.reset();
+    stateText.textContent = message;
+    actions.replaceChildren(); help.replaceChildren();
+    const blocked = ['test-clock', 'storage-unavailable', 'paused-local', 'locks-unavailable', 'meta-corrupt'].includes(code);
+    for (const control of [client, target, save]) control.disabled = blocked || code === 'disconnecting';
+    if (code === 'unconfigured') help.append(p('Google Cloudで発行したIDと、Googleカレンダーの「カレンダーの統合」にあるIDを入力してください。', 'muted'));
+    if (['meta-corrupt', 'integrity'].includes(code)) actions.append(button('連携情報をリセット', async () => {
+      if (confirm('このブラウザの連携設定を消去します。Googleの予定と端末の計画はそのままです。')) {
+        await engine.reset(); loadSettings();
+      }
     }));
-    else if (['binding-lost', 'creation-ambiguous'].includes(code)) actions.append(button('新しい専用カレンダーを作成', () => {
-      if (confirm('新しい「人生ロードマップ」を作ります。以前のカレンダーが残る場合があります。古い予定は変更しません。作成しますか？')) void engine.createAgain();
-    }));
-    else if (!['loading', 'signing-in', 'disconnecting'].includes(code)) {
-      if (['synced', 'syncing', 'backoff', 'offline', 'sync-error', 'other-tab'].includes(code)) actions.append(button('今すぐ同期', () => engine.request('manual'), { disabled: code === 'syncing' }));
-      else actions.append(button(ready ? 'Googleでログイン' : 'Googleカレンダーに接続', ready ? () => { void engine.connect(); } : () => { void prepare(); }, { disabled: blocked }));
+    if (code === 'ready') actions.append(button('Googleでログイン', () => { void engine.connect(); }));
+    if (['off', 'needs-sign-in', 'binding-lost', 'permission', 'gis-unavailable', 'revoke-unconfirmed'].includes(code)) {
+      actions.append(button('Googleカレンダーに接続', () => { void engine.prepare(); }));
     }
-    if (!['off', 'unconfigured', 'test-clock', 'ready', 'loading', 'disconnecting', 'revoke-unconfirmed', 'meta-corrupt', 'storage-unavailable'].includes(code)) actions.append(button('接続を解除', () => { void engine.disconnect(); }));
-    panel.replaceChildren(p(message, 'status'), actions);
-    if (code === 'unconfigured') panel.append(p('先に docs/google-calendar-setup.md の手順で公開用クライアントIDを用意してください。', 'muted'));
-    if (code === 'revoke-unconfirmed') panel.append(p('Googleアカウントの「サードパーティとの接続」から、このアプリの許可を取り消してください。', 'muted'));
-    const attention = ['needs-sign-in', 'permission', 'binding-lost', 'creation-ambiguous', 'meta-corrupt', 'meta-write-failed', 'paused-local', 'integrity', 'api-error', 'sync-error', 'revoke-unconfirmed'].includes(code);
-    alert.hidden = !attention; alert.textContent = attention ? `カレンダー：${message}。画面下部の「Googleカレンダー連携」を開いてください。` : '';
+    if (['synced', 'offline', 'backoff', 'sync-error', 'other-tab', 'changed', 'api-error', 'meta-write-failed', 'integrity'].includes(code)) {
+      actions.append(button('今すぐ同期', () => engine.request('manual')));
+    }
+    if (['remote', 'collision', 'continuity'].includes(code)) {
+      actions.append(button('再確認して再開', () => engine.reconsider()));
+      if (code !== 'continuity') {
+        help.append(p('Googleカレンダーで、このカレンダーの今日以降にある「みちしるべから自動同期」の予定を確認してください。不要なアプリ予定だけを整理して再確認するか、別の既存副カレンダーIDを入力してください。', 'muted'));
+      }
+      if (Array.isArray(detail) && detail.length) help.append(el('ul', {}, detail.map(e => el('li', {}, [e.date, e.summary].filter(Boolean).join(' ')))));
+    }
+    if (code === 'review-resume' && detail) {
+      help.append(p(`入力した「人生ロードマップ」に現在の計画を反映します。追加 ${detail.insert}件・更新 ${detail.update}件・削除 ${detail.delete}件。`));
+      if (detail.targets.length) {
+        help.append(p('更新・削除の対象（一部）', 'muted'), el('ul', {},
+          detail.targets.map(e => el('li', {}, [e.date, e.summary].filter(Boolean).join(' ')))));
+      }
+      actions.append(button('この計画で同期を再開', () => engine.reconsider(true)));
+    }
+    if (!blocked && !['off', 'unconfigured', 'loading', 'disconnecting', 'revoke-unconfirmed', 'invalid-client', 'invalid-calendar'].includes(code)) {
+      actions.append(button('接続を解除', () => { void engine.disconnect(); }));
+    }
+    if (code === 'revoke-unconfirmed') help.append(p('Googleアカウントの「サードパーティとの接続」から、このアプリの許可を取り消せます。', 'muted'));
+    const attention = ['needs-sign-in', 'permission', 'binding-lost', 'meta-corrupt', 'meta-write-failed', 'paused-local',
+      'integrity', 'api-error', 'sync-error', 'revoke-unconfirmed', 'remote', 'collision', 'continuity', 'changed'].includes(code);
+    alert.hidden = !attention;
+    alert.textContent = attention ? `カレンダー：${message}。画面下部の「Googleカレンダー連携」を開いてください。` : '';
   }
-  engine = createCalendarSync({ storage, store, auth, api, clientId: GOOGLE_CLIENT_ID, testClock, allowTestClock: ALLOW_TEST_CLOCK, now, onStatus: display });
+
+  const engine = createCalendarSync({
+    storage, store, now, testClock, onStatus: display,
+    makeAuth: clientId => createGoogleAuth({ clientId, now }),
+    makeApi: (calendarId, getToken) => createCalendarApi({ calendarId, getToken })
+  });
+  loadSettings();
   window.addEventListener('online', () => engine.request('online'));
   window.addEventListener('offline', () => engine.request('offline'));
-  window.addEventListener('storage', () => engine.request('storage'));
+  window.addEventListener('storage', event => {
+    if (event.key === META_KEY || event.key === null) {
+      // Keep local edits to the form until the user decides whether to save them.
+      engine.request('storage');
+    }
+  });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) engine.request('visible'); });
   setInterval(() => engine.request('clock'), 60000);
   engine.request('start');

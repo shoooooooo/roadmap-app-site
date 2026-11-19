@@ -23,7 +23,7 @@
   </nav>
   <main id="main"></main>
   <footer><details id="backup-panel"><summary>データの書き出し・復元</summary><p>このブラウザだけに保存しています。定期的にバックアップしてください。復元すると現在のデータ全体を置き換えます。</p><div class="actions"><button id="export">バックアップを書き出す</button><button id="raw-export">保存中の元データを出力</button></div><label class="file-label" for="restore-file">バックアップから復元（JSON・1MBまで）</label><input id="restore-file" type="file" accept="application/json,.json"><p id="backup-message" role="status"></p></details><p class="footnote">架空のサンプルから始める、あなたの計画帳。日本時間・月曜始まり。</p></footer>
-  <section class="calendar-section" aria-label="カレンダー連携"><p id="calendar-status" role="status" aria-live="polite">カレンダー未接続</p><details id="calendar-panel"><summary>Googleカレンダー連携</summary><p>接続すると、今日・今週のこれから行う予定を専用の「人生ロードマップ」へ自動反映します。カレンダーはアプリが作ります。日付未指定の行動は今週の範囲でまとめます。</p><p>送るのは予定名・分数・日付です。メモと過去の実施記録は送りません。トークンは保存せず、期限切れや開き直し後は再接続が必要です。オフライン中も記録でき、アプリを開いて有効な接続が戻ると同期します。</p><div id="calendar-controls"></div></details></section>
+  <section class="calendar-section" aria-label="カレンダー連携"><p id="calendar-status" role="status" aria-live="polite">カレンダー未接続</p><details id="calendar-panel"><summary>Googleカレンダー連携</summary><p>本人が所有する既存の副カレンダー「人生ロードマップ」に、今日・今週の予定を反映します。同期元は一台のブラウザに決め、スマートフォンではGoogleカレンダーから閲覧してください。</p><p>送るのは予定名・分数・日付です。メモと過去の実施記録は送りません。トークンは保存せず、期限切れや開き直し後は再接続が必要です。オフライン中も記録でき、アプリを開いて有効な接続が戻ると同期します。</p><div id="calendar-controls"></div></details></section>
   <div id="toast" role="status" aria-live="polite"></div>
   <dialog id="dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div><button id="dialog-close" class="quiet">閉じる</button></dialog>
 </body>
